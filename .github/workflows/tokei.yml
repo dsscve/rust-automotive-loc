@@ -3,7 +3,7 @@ name: Rust LOC Analysis
 on:
   workflow_dispatch:   # manual trigger
   schedule:
-    - cron: "0 3 * * 1"  # optional: every Monday at 03:00 UTC
+    - cron: "0 3 * * 1"  # optional: run every Monday at 03:00 UTC
 
 jobs:
   count-loc:
@@ -22,15 +22,15 @@ jobs:
         run: mkdir -p work
 
       - name: Run tokei on listed repos
-  run: |
-    echo "repo,rust_files,rust_code,rust_comments,rust_blanks" > rust_loc_results.csv
-    while read -r repo; do
-      [[ -z "$repo" ]] && continue
-      echo "Processing $repo..."
-      dir="work/$(echo "$repo" | tr / _)"
-      git clone --depth 1 "https://github.com/$repo.git" "$dir" --quiet || continue
-      tokei "$dir" --output json > "$dir/tokei.json"
-      python3 - "$repo" <<'PY'
+        run: |
+          echo "repo,rust_files,rust_code,rust_comments,rust_blanks" > rust_loc_results.csv
+          while read -r repo; do
+            [[ -z "$repo" ]] && continue
+            echo "Processing $repo..."
+            dir="work/$(echo "$repo" | tr / _)"
+            git clone --depth 1 "https://github.com/$repo.git" "$dir" --quiet || continue
+            tokei "$dir" --output json > "$dir/tokei.json"
+            python3 - "$repo" <<'PY'
 import json
 import sys
 
@@ -48,4 +48,10 @@ try:
 except Exception:
     print(f"{repo},0,0,0,0")
 PY
-    done < repos.txt >> rust_loc_results.csv
+          done < repos.txt >> rust_loc_results.csv
+
+      - name: Upload LOC results
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-loc-results
+          path: rust_loc_results.csv
