@@ -7,3 +7,4 @@ KoffeinFlummi/rustbucket
 Konseptt/Rust-Autonomous-Vehicle-Simulation
 jonlamb-gh/oxcc-stm32f767-hal
 jonlamb-gh/oxcc-nucleo
+juspay/hyperswitch
