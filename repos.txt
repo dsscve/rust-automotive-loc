@@ -1,0 +1,9 @@
+shishir-dey/libautomotive
+I-CAN-hack/automotive
+jonlamb-gh/oxcc
+rnd-ash/ecu_diagnostics
+rnd-ash/OpenVehicleDiag
+KoffeinFlummi/rustbucket
+Konseptt/Rust-Autonomous-Vehicle-Simulation
+jonlamb-gh/oxcc-stm32f767-hal
+jonlamb-gh/oxcc-nucleo
