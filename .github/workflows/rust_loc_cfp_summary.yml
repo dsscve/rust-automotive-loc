@@ -1,0 +1,116 @@
+name: Rust LOC + CFP Analysis with Summary
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * 1"  # optional: every Monday at 03:00 UTC
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3 git
+          cargo install tokei
+
+      - name: Prepare work directory
+        run: mkdir -p work
+
+      - name: Clone repos and run tokei
+        run: |
+          echo "repo,rust_files,rust_code,rust_comments,rust_blanks" > rust_loc_results.csv
+          while read -r repo; do
+            [[ -z "$repo" ]] && continue
+            echo "Processing $repo..."
+            dir="work/$(echo "$repo" | tr / _)"
+            git clone --depth 1 "https://github.com/$repo.git" "$dir" --quiet || continue
+            tokei "$dir" --output json > "$dir/tokei.json"
+            python3 - "$repo" "$dir/tokei.json" <<'PY'
+import json, os, sys
+
+repo = sys.argv[1]
+path = sys.argv[2]
+
+try:
+    with open(path) as f:
+        data = json.load(f)
+    rust = data.get("Rust") or data.get("rust")
+    if rust:
+        print(f"{repo},{rust.get('files',0)},{rust.get('code',0)},{rust.get('comments',0)},{rust.get('blanks',0)}")
+    else:
+        print(f"{repo},0,0,0,0")
+except Exception:
+    print(f"{repo},0,0,0,0")
+PY
+          done < repos.txt >> rust_loc_results.csv
+
+      - name: Estimate CFP and Summary Stats
+        run: |
+          python3 - <<'PY'
+import csv
+import os
+import re
+
+# Heuristics for data movements
+def count_movements(rs_file):
+    e = x = r = w = 0
+    try:
+        with open(rs_file, 'r') as f:
+            code = f.read()
+            e += len(re.findall(r'pub fn ', code))
+            x += len(re.findall(r'-> .*String', code)) + len(re.findall(r'println!', code))
+            r += len(re.findall(r'std::fs::read', code))
+            w += len(re.findall(r'std::fs::write', code))
+    except:
+        pass
+    return e, x, r, w
+
+input_csv = "rust_loc_results.csv"
+output_csv = "rust_loc_results_with_summary.csv"
+
+with open(input_csv) as infile, open(output_csv, 'w', newline='') as outfile:
+    reader = csv.DictReader(infile)
+    fieldnames = reader.fieldnames + ["Entry", "Exit", "Read", "Write", "CFP", "eLOC_per_CFP"]
+    writer = csv.DictWriter(outfile, fieldnames=fieldnames)
+    writer.writeheader()
+
+    for row in reader:
+        repo_dir = os.path.join("work", row["repo"])
+        e_total = x_total = r_total = w_total = 0
+        if os.path.exists(repo_dir):
+            for root, _, files in os.walk(repo_dir):
+                for file in files:
+                    if file.endswith(".rs"):
+                        rs_file = os.path.join(root, file)
+                        e, x, r, w = count_movements(rs_file)
+                        e_total += e
+                        x_total += x
+                        r_total += r
+                        w_total += w
+        cfp = e_total + x_total + r_total + w_total
+        try:
+            eloc = int(row["rust_code"])
+            ratio = round(eloc / cfp, 2) if cfp > 0 else 0
+        except:
+            ratio = 0
+        row.update({
+            "Entry": e_total,
+            "Exit": x_total,
+            "Read": r_total,
+            "Write": w_total,
+            "CFP": cfp,
+            "eLOC_per_CFP": ratio
+        })
+        writer.writerow(row)
+PY
+
+      - name: Upload LOC + CFP + Summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-loc-cfp-summary
+          path: rust_loc_results_with_summary.csv
