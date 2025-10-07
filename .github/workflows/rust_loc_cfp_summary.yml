@@ -129,13 +129,3 @@ with open(input_csv) as infile, open(output_csv, 'w', newline='') as outfile:
         "Exit": "",
         "Read": "",
         "Write": "",
-        "CFP": total_cfp,
-        "eLOC_per_CFP": avg_ratio
-    })
-PY
-
-      - name: Upload LOC + CFP + Summary
-        uses: actions/upload-artifact@v4
-        with:
-          name: rust-loc-cfp-summary
-          path: rust_loc_results_with_summary.csv
