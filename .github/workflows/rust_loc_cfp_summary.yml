@@ -1,13 +1,14 @@
 name: Rust LOC + CFP Analysis with Summary Totals
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:      # manual trigger
   schedule:
-    - cron: "0 3 * * 1"  # optional: every Monday at 03:00 UTC
+    - cron: "0 3 * * 1"   # optional: run every Monday at 03:00 UTC
 
 jobs:
   analyze:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -30,12 +31,14 @@ jobs:
             dir="work/$(echo "$repo" | tr / _)"
             git clone --depth 1 "https://github.com/$repo.git" "$dir" --quiet || continue
             tokei "$dir" --output json > "$dir/tokei.json"
+            python3 - <<'PY'
+import json, sys
+repo = sys.stdin.readline().strip()
+PY
             python3 - "$repo" "$dir/tokei.json" <<'PY'
 import json, os, sys
-
 repo = sys.argv[1]
 path = sys.argv[2]
-
 try:
     with open(path) as f:
         data = json.load(f)
@@ -50,46 +53,10 @@ PY
           done < repos.txt >> rust_loc_results.csv
 
       - name: Estimate CFP and Summary Stats
-        run: |
-          python3 - <<'PY'
-import csv
-import os
-import re
+        run: python3 scripts/analyze_loc_cfp.py
 
-def count_movements(rs_file):
-    e = x = r = w = 0
-    try:
-        with open(rs_file, 'r', encoding="utf-8", errors="ignore") as f:
-            code = f.read()
-            e += len(re.findall(r'pub fn ', code))
-            x += len(re.findall(r'-> .*String', code)) + len(re.findall(r'println!', code))
-            r += len(re.findall(r'std::fs::read', code))
-            w += len(re.findall(r'std::fs::write', code))
-    except:
-        pass
-    return e, x, r, w
-
-input_csv = "rust_loc_results.csv"
-output_csv = "rust_loc_results_with_summary.csv"
-
-total_eloc = 0
-total_cfp = 0
-
-with open(input_csv) as infile, open(output_csv, 'w', newline='') as outfile:
-    reader = csv.DictReader(infile)
-    fieldnames = reader.fieldnames + ["Entry", "Exit", "Read", "Write", "CFP", "eLOC_per_CFP"]
-    writer = csv.DictWriter(outfile, fieldnames=fieldnames)
-    writer.writeheader()
-
-    for row in reader:
-        repo = row["repo"]
-        repo_dir = os.path.join("work", repo.replace("/", "_"))
-        e_total = x_total = r_total = w_total = 0
-
-        if os.path.exists(repo_dir):
-            for root, _, files in os.walk(repo_dir):
-                for file in files:
-                    if file.endswith(".rs"):
-                        rs_file = os.path.join(root, file)
-                        e, x, r, w = count_movements(rs_file)
-                        e
+      - name: Upload LOC + CFP + Summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-loc-cfp-summary
+          path: rust_loc_results_with_summary.csv
