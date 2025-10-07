@@ -1,52 +1,51 @@
 name: Fetch Top Rust Repos
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:  # Manual trigger
 
 jobs:
   fetch-repos:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. Checkout repo without default credentials
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
-          persist-credentials: false  # Don't use default GITHUB_TOKEN
+          persist-credentials: false
 
+      # 2. Install jq for JSON parsing
       - name: Set up jq
         run: sudo apt-get update && sudo apt-get install -y jq
 
+      # 3. Fetch top Rust repos from GitHub API
       - name: Fetch top Rust repos
         env:
           PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
           echo "Fetching top Rust repositories..."
           rm -f repos.txt
-          
           for page in {1..10}; do
             echo "Fetching page $page..."
             RESPONSE=$(curl -s -H "Authorization: token $PAT_TOKEN" \
               "https://api.github.com/search/repositories?q=language:Rust+stars:>=1000&sort=stars&order=desc&page=$page&per_page=100")
-            
             echo "$RESPONSE" | jq -r '.items[].html_url' >> repos.txt
             sleep 2
           done
-
           echo "Total repos fetched: $(wc -l < repos.txt)"
 
+      # 4. Configure git to use PAT and push to separate branch
       - name: Configure git with PAT
         env:
           PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-
-          # Set remote URL with PAT explicitly
-          git remote set-url origin https://x-access-token:${PAT_TOKEN}@github.com/${{ github.repository }}.git
-
-          # Create or switch to update branch
+          git remote remove origin
+          git remote add origin https://x-access-token:${PAT_TOKEN}@github.com/${{ github.repository }}.git
           git checkout -B rust-repos-update
 
+      # 5. Commit and push repos.txt
       - name: Commit and push repos.txt
         run: |
           git add repos.txt
