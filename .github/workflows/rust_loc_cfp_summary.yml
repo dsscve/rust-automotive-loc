@@ -56,7 +56,6 @@ import csv
 import os
 import re
 
-# --- Helper to count data movements ---
 def count_movements(rs_file):
     e = x = r = w = 0
     try:
@@ -93,47 +92,4 @@ with open(input_csv) as infile, open(output_csv, 'w', newline='') as outfile:
                     if file.endswith(".rs"):
                         rs_file = os.path.join(root, file)
                         e, x, r, w = count_movements(rs_file)
-                        e_total += e
-                        x_total += x
-                        r_total += r
-                        w_total += w
-
-        cfp = e_total + x_total + r_total + w_total
-        eloc = int(row.get("rust_code", 0) or 0)
-        ratio = round(eloc / cfp, 2) if cfp > 0 else 0
-
-        total_eloc += eloc
-        total_cfp += cfp
-
-        row.update({
-            "Entry": e_total,
-            "Exit": x_total,
-            "Read": r_total,
-            "Write": w_total,
-            "CFP": cfp,
-            "eLOC_per_CFP": ratio
-        })
-        writer.writerow(row)
-
-    # --- Add total summary row ---
-    avg_ratio = round(total_eloc / total_cfp, 2) if total_cfp > 0 else 0
-    writer.writerow({
-        "repo": "TOTAL SUMMARY",
-        "rust_files": "",
-        "rust_code": total_eloc,
-        "rust_comments": "",
-        "rust_blanks": "",
-        "Entry": "",
-        "Exit": "",
-        "Read": "",
-        "Write": "",
-        "CFP": total_cfp,
-        "eLOC_per_CFP": avg_ratio
-    })
-PY
-
-      - name: Upload LOC + CFP + Summary
-        uses: actions/upload-artifact@v4
-        with:
-          name: rust-loc-cfp-summary
-          path: rust_loc_results_with_summary.csv
+                        e
