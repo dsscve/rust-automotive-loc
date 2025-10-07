@@ -1,4 +1,4 @@
-name: Rust LOC + CFP Analysis with Summary
+name: Rust LOC + CFP Analysis with Summary Totals
 
 on:
   workflow_dispatch:
@@ -56,11 +56,11 @@ import csv
 import os
 import re
 
-# Heuristics for data movements
+# --- Helper to count data movements ---
 def count_movements(rs_file):
     e = x = r = w = 0
     try:
-        with open(rs_file, 'r') as f:
+        with open(rs_file, 'r', encoding="utf-8", errors="ignore") as f:
             code = f.read()
             e += len(re.findall(r'pub fn ', code))
             x += len(re.findall(r'-> .*String', code)) + len(re.findall(r'println!', code))
@@ -73,6 +73,10 @@ def count_movements(rs_file):
 input_csv = "rust_loc_results.csv"
 output_csv = "rust_loc_results_with_summary.csv"
 
+total_eloc = 0
+total_cfp = 0
+repos_processed = 0
+
 with open(input_csv) as infile, open(output_csv, 'w', newline='') as outfile:
     reader = csv.DictReader(infile)
     fieldnames = reader.fieldnames + ["Entry", "Exit", "Read", "Write", "CFP", "eLOC_per_CFP"]
@@ -80,8 +84,10 @@ with open(input_csv) as infile, open(output_csv, 'w', newline='') as outfile:
     writer.writeheader()
 
     for row in reader:
-        repo_dir = os.path.join("work", row["repo"])
+        repo = row["repo"]
+        repo_dir = os.path.join("work", repo.replace("/", "_"))
         e_total = x_total = r_total = w_total = 0
+
         if os.path.exists(repo_dir):
             for root, _, files in os.walk(repo_dir):
                 for file in files:
@@ -92,12 +98,15 @@ with open(input_csv) as infile, open(output_csv, 'w', newline='') as outfile:
                         x_total += x
                         r_total += r
                         w_total += w
+
         cfp = e_total + x_total + r_total + w_total
-        try:
-            eloc = int(row["rust_code"])
-            ratio = round(eloc / cfp, 2) if cfp > 0 else 0
-        except:
-            ratio = 0
+        eloc = int(row.get("rust_code", 0) or 0)
+        ratio = round(eloc / cfp, 2) if cfp > 0 else 0
+
+        total_eloc += eloc
+        total_cfp += cfp
+        repos_processed += 1
+
         row.update({
             "Entry": e_total,
             "Exit": x_total,
@@ -107,6 +116,22 @@ with open(input_csv) as infile, open(output_csv, 'w', newline='') as outfile:
             "eLOC_per_CFP": ratio
         })
         writer.writerow(row)
+
+    # --- Add total summary row ---
+    avg_ratio = round(total_eloc / total_cfp, 2) if total_cfp > 0 else 0
+    writer.writerow({
+        "repo": "TOTAL SUMMARY",
+        "rust_files": "",
+        "rust_code": total_eloc,
+        "rust_comments": "",
+        "rust_blanks": "",
+        "Entry": "",
+        "Exit": "",
+        "Read": "",
+        "Write": "",
+        "CFP": total_cfp,
+        "eLOC_per_CFP": avg_ratio
+    })
 PY
 
       - name: Upload LOC + CFP + Summary
