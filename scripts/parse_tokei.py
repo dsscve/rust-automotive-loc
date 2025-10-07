@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import json, sys, os
+import json, sys
 
 repo = sys.argv[1]
 path = sys.argv[2]
