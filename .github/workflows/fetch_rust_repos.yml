@@ -1,7 +1,7 @@
 name: Fetch Top Rust Repos
 
 on:
-  workflow_dispatch:  # Allows manual trigger
+  workflow_dispatch:
 
 jobs:
   fetch-repos:
@@ -16,7 +16,7 @@ jobs:
 
       - name: Fetch top Rust repos
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
           echo "Fetching top Rust repositories..."
           rm -f repos.txt
@@ -26,19 +26,20 @@ jobs:
             RESPONSE=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
               "https://api.github.com/search/repositories?q=language:Rust+stars:>=1000&sort=stars&order=desc&page=$page&per_page=100")
             
-            # Extract repository URLs
             echo "$RESPONSE" | jq -r '.items[].html_url' >> repos.txt
-            
-            # Respect GitHub API limits
             sleep 2
           done
 
           echo "Total repos fetched: $(wc -l < repos.txt)"
 
-      - name: Commit and push repos.txt
+      - name: Configure git to use PAT
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
+          git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git
+
+      - name: Commit and push repos.txt
+        run: |
           git add repos.txt
           git commit -m "Update top Rust repos" || echo "No changes to commit"
-          git push
+          git push origin main
