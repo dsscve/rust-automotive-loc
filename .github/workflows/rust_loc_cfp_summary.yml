@@ -1,7 +1,7 @@
 name: Rust LOC + CFP Analysis with Summary Totals
 
 on:
-  workflow_dispatch:      # manual trigger
+  workflow_dispatch:
   schedule:
     - cron: "0 3 * * 1"   # optional: run every Monday at 03:00 UTC
 
@@ -31,14 +31,14 @@ jobs:
             dir="work/$(echo "$repo" | tr / _)"
             git clone --depth 1 "https://github.com/$repo.git" "$dir" --quiet || continue
             tokei "$dir" --output json > "$dir/tokei.json"
-            python3 - <<'PY'
-import json, sys
-repo = sys.stdin.readline().strip()
-PY
+
+            # Run inline Python safely
             python3 - "$repo" "$dir/tokei.json" <<'PY'
 import json, os, sys
+
 repo = sys.argv[1]
 path = sys.argv[2]
+
 try:
     with open(path) as f:
         data = json.load(f)
