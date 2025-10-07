@@ -6,10 +6,26 @@ def count_movements(rs_file):
     try:
         with open(rs_file, 'r', encoding="utf-8", errors="ignore") as f:
             code = f.read()
-            e += len(re.findall(r'pub fn ', code))
+
+            # --- Basic movements ---
+            e += len(re.findall(r'\bpub fn\b', code))
             x += len(re.findall(r'-> .*String', code)) + len(re.findall(r'println!', code))
             r += len(re.findall(r'std::fs::read', code))
             w += len(re.findall(r'std::fs::write', code))
+
+            # --- Heuristic 1: Async functions ---
+            async_funcs = re.findall(r'\basync fn\b', code)
+            e += len(async_funcs)        # Entry
+            x += len(async_funcs)        # Exit, consider async fn returns data later
+
+            # --- Heuristic 2: Struct definitions (potential data storage) ---
+            structs = re.findall(r'\bstruct\b\s+\w+', code)
+            e += len(structs)
+
+            # --- Heuristic 3: Common I/O patterns ---
+            r += len(re.findall(r'read_to_string|tokio::fs::read', code))
+            w += len(re.findall(r'write_all|tokio::fs::write', code))
+
     except:
         pass
     return e, x, r, w
