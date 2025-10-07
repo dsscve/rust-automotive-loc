@@ -1,35 +1,47 @@
-#!/usr/bin/env python3
-import csv, os, re
+import csv
+import os
+import re
 
+# --- Helper: count COSMIC-like movements ---
 def count_movements(rs_file):
     e = x = r = w = 0
     try:
         with open(rs_file, 'r', encoding="utf-8", errors="ignore") as f:
             code = f.read()
 
-            # --- Basic movements ---
-            e += len(re.findall(r'\bpub fn\b', code))
-            x += len(re.findall(r'-> .*String', code)) + len(re.findall(r'println!', code))
-            r += len(re.findall(r'std::fs::read', code))
-            w += len(re.findall(r'std::fs::write', code))
+            # --- Ignore async functions (0 CFP) ---
+            code = re.sub(r'\basync fn\b.*?{.*?}', '', code, flags=re.DOTALL)
 
-            # --- Heuristic 1: Async functions ---
-            async_funcs = re.findall(r'\basync fn\b', code)
-            e += len(async_funcs)        # Entry
-            x += len(async_funcs)        # Exit, consider async fn returns data later
+            # --- Entry / Exit ---
+            e += len(re.findall(r'\bpub fn\b', code))          # public functions as Entry
+            x += len(re.findall(r'-> .*String', code))        # functions returning data as Exit
+            x += len(re.findall(r'println!', code))           # output as Exit
 
-            # --- Heuristic 2: Struct definitions (potential data storage) ---
-            structs = re.findall(r'\bstruct\b\s+\w+', code)
-            e += len(structs)
+            # --- I/O movements ---
+            r += len(re.findall(r'std::fs::read', code))      # read operations
+            r += len(re.findall(r'std::fs::read_to_string', code))
+            w += len(re.findall(r'std::fs::write', code))     # write operations
+            w += len(re.findall(r'std::fs::write_all', code))
 
-            # --- Heuristic 3: Common I/O patterns ---
-            r += len(re.findall(r'read_to_string|tokio::fs::read', code))
-            w += len(re.findall(r'write_all|tokio::fs::write', code))
+            # --- Structs: only count if used in function or impl block ---
+            structs = re.findall(r'\bstruct\b\s+(\w+)', code)
+            for struct_name in structs:
+                # Count if referenced inside any function body
+                pattern = r'fn\b.*?{[^}]*\b' + re.escape(struct_name) + r'\b'
+                if re.search(pattern, code, flags=re.DOTALL):
+                    e += 1
+
+                # Count methods in impl blocks
+                impl_pattern = r'impl\s+' + re.escape(struct_name) + r'\s*{([^}]*)}'
+                for match in re.finditer(impl_pattern, code, flags=re.DOTALL):
+                    methods = re.findall(r'\bfn\b', match.group(1))
+                    e += len(methods)
 
     except:
         pass
     return e, x, r, w
 
+# --- Input / Output CSVs ---
 input_csv = "rust_loc_results.csv"
 output_csv = "rust_loc_results_with_summary.csv"
 
@@ -38,7 +50,7 @@ total_cfp = 0
 
 with open(input_csv) as infile, open(output_csv, 'w', newline='') as outfile:
     reader = csv.DictReader(infile)
-    fieldnames = reader.fieldnames + ["Entry","Exit","Read","Write","CFP","eLOC_per_CFP"]
+    fieldnames = reader.fieldnames + ["Entry", "Exit", "Read", "Write", "CFP", "eLOC_per_CFP"]
     writer = csv.DictWriter(outfile, fieldnames=fieldnames)
     writer.writeheader()
 
