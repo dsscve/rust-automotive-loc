@@ -75,7 +75,6 @@ output_csv = "rust_loc_results_with_summary.csv"
 
 total_eloc = 0
 total_cfp = 0
-repos_processed = 0
 
 with open(input_csv) as infile, open(output_csv, 'w', newline='') as outfile:
     reader = csv.DictReader(infile)
@@ -105,7 +104,6 @@ with open(input_csv) as infile, open(output_csv, 'w', newline='') as outfile:
 
         total_eloc += eloc
         total_cfp += cfp
-        repos_processed += 1
 
         row.update({
             "Entry": e_total,
@@ -129,3 +127,13 @@ with open(input_csv) as infile, open(output_csv, 'w', newline='') as outfile:
         "Exit": "",
         "Read": "",
         "Write": "",
+        "CFP": total_cfp,
+        "eLOC_per_CFP": avg_ratio
+    })
+PY
+
+      - name: Upload LOC + CFP + Summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-loc-cfp-summary
+          path: rust_loc_results_with_summary.csv
