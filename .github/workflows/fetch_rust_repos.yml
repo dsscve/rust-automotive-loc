@@ -1,57 +1,33 @@
-name: Fetch Top Rust Repos
+name: Generate Rust Repos List
 
 on:
-  workflow_dispatch: # manual trigger; can be changed to schedule later
+  workflow_dispatch:  # manual trigger
 
 jobs:
-  fetch-repos:
+  generate-repos:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout repo without default credentials
-      - name: Checkout repository
-        uses: actions/checkout@v3
-        with:
-          persist-credentials: false  # important
-
-      # 2. Install jq for JSON parsing
-      - name: Set up jq
+      # 1. Install jq for JSON parsing
+      - name: Install jq
         run: sudo apt-get update && sudo apt-get install -y jq
 
-      # 3. Fetch top Rust repos from GitHub API
+      # 2. Fetch top Rust repos
       - name: Fetch top Rust repos
-        env:
-          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
           echo "Fetching top Rust repositories..."
           rm -f repos.txt
           for page in {1..10}; do
-            echo "Fetching page $page..."
-            RESPONSE=$(curl -s -H "Authorization: token $PAT_TOKEN" \
+            RESPONSE=$(curl -s \
               "https://api.github.com/search/repositories?q=language:Rust+stars:>=1000&sort=stars&order=desc&page=$page&per_page=100")
             echo "$RESPONSE" | jq -r '.items[].html_url' >> repos.txt
             sleep 2
           done
           echo "Total repos fetched: $(wc -l < repos.txt)"
 
-      # 4. Configure git to use PAT and push to a separate branch
-      - name: Configure git with PAT
-        env:
-          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-
-          # Remove old remote and re-add using PAT
-          git remote remove origin
-          git remote add origin https://x-access-token:${PAT_TOKEN}@github.com/${{ github.repository }}.git
-
-          # Create or switch to update branch
-          git checkout -B rust-repos-update
-
-      # 5. Commit and push repos.txt
-      - name: Commit and push
-        run: |
-          git add repos.txt
-          git commit -m "Update top Rust repos" || echo "No changes to commit"
-          git push origin rust-repos-update --force
+      # 3. Upload as workflow artifact
+      - name: Upload repos.txt
+        uses: actions/upload-artifact@v3
+        with:
+          name: rust-repos
+          path: repos.txt
