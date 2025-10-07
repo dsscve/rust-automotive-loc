@@ -1,7 +1,7 @@
 name: Fetch Top Rust Repos
 
 on:
-  workflow_dispatch:  # Manual trigger
+  workflow_dispatch: # manual trigger; can be changed to schedule later
 
 jobs:
   fetch-repos:
@@ -12,7 +12,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
-          persist-credentials: false
+          persist-credentials: false  # important
 
       # 2. Install jq for JSON parsing
       - name: Set up jq
@@ -34,19 +34,23 @@ jobs:
           done
           echo "Total repos fetched: $(wc -l < repos.txt)"
 
-      # 4. Configure git to use PAT and push to separate branch
+      # 4. Configure git to use PAT and push to a separate branch
       - name: Configure git with PAT
         env:
           PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
+
+          # Remove old remote and re-add using PAT
           git remote remove origin
           git remote add origin https://x-access-token:${PAT_TOKEN}@github.com/${{ github.repository }}.git
+
+          # Create or switch to update branch
           git checkout -B rust-repos-update
 
       # 5. Commit and push repos.txt
-      - name: Commit and push repos.txt
+      - name: Commit and push
         run: |
           git add repos.txt
           git commit -m "Update top Rust repos" || echo "No changes to commit"
