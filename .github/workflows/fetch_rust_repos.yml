@@ -25,9 +25,9 @@ jobs:
           done
           echo "Total repos fetched: $(wc -l < repos.txt)"
 
-      # 3. Upload as workflow artifact
+      # 3. Upload repos.txt as an artifact
       - name: Upload repos.txt
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: rust-repos
           path: repos.txt
