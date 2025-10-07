@@ -1,9 +1,9 @@
 name: Rust LOC + CFP Analysis with Summary Totals
 
 on:
-  workflow_dispatch:       # manual trigger
+  workflow_dispatch:
   schedule:
-    - cron: "0 3 * * 1"    # optional: every Monday at 03:00 UTC
+    - cron: "0 3 * * 1"  # optional: every Monday at 03:00 UTC
 
 jobs:
   analyze:
@@ -31,22 +31,7 @@ jobs:
             dir="work/$(echo "$repo" | tr / _)"
             git clone --depth 1 "https://github.com/$repo.git" "$dir" --quiet || continue
             tokei "$dir" --output json > "$dir/tokei.json"
-            python3 - "$repo" "$dir/tokei.json" <<'PY'
-import json, os, sys
-
-repo = sys.argv[1]
-path = sys.argv[2]
-try:
-    with open(path) as f:
-        data = json.load(f)
-    rust = data.get("Rust") or data.get("rust")
-    if rust:
-        print(f"{repo},{rust.get('files',0)},{rust.get('code',0)},{rust.get('comments',0)},{rust.get('blanks',0)}")
-    else:
-        print(f"{repo},0,0,0,0")
-except Exception:
-    print(f"{repo},0,0,0,0")
-PY
+            python3 scripts/parse_tokei.py "$repo" "$dir/tokei.json"
           done < repos.txt >> rust_loc_results.csv
 
       - name: Estimate CFP and Summary Stats
@@ -54,13 +39,11 @@ PY
           python3 - <<'PY'
 import csv, os, re
 
-# --- Helper: count COSMIC-like movements ---
 def count_movements(rs_file):
     e = x = r = w = 0
     try:
         with open(rs_file, 'r', encoding="utf-8", errors="ignore") as f:
             code = f.read()
-            # simple heuristics
             e += len(re.findall(r'pub fn ', code))
             x += len(re.findall(r'-> .*String', code)) + len(re.findall(r'println!', code))
             r += len(re.findall(r'std::fs::read', code))
@@ -77,7 +60,7 @@ total_cfp = 0
 
 with open(input_csv) as infile, open(output_csv, 'w', newline='') as outfile:
     reader = csv.DictReader(infile)
-    fieldnames = reader.fieldnames + ["Entry", "Exit", "Read", "Write", "CFP", "eLOC_per_CFP"]
+    fieldnames = reader.fieldnames + ["Entry","Exit","Read","Write","CFP","eLOC_per_CFP"]
     writer = csv.DictWriter(outfile, fieldnames=fieldnames)
     writer.writeheader()
 
