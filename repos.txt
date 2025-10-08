@@ -1,7 +1,6 @@
 orf/gping
 ClementTsang/bottom
 Canop/broot
-microsoft/windows-rs
 svenstaro/genact
 elkowar/eww
 hyperium/tonic
