@@ -1,9 +1,9 @@
-name: Rust LOC + CFP Analysis with Network I/O (Async Excluded)
+     name: Rust LOC + CFP Analysis (with Network I/O, Async Excluded)
 
 on:
-  workflow_dispatch:       # manual trigger
+  workflow_dispatch:       # Manual trigger
   schedule:
-    - cron: "0 4 * * 1"    # optional: every Monday at 04:00 UTC
+    - cron: "0 3 * * 1"    # Optional: every Monday at 03:00 UTC
 
 jobs:
   analyze:
@@ -18,9 +18,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y python3 git
           cargo install tokei
-
-      - name: Prepare work directory
-        run: mkdir -p work
+          mkdir -p work
 
       - name: Clone repos and run tokei
         run: |
@@ -31,20 +29,8 @@ jobs:
             dir="work/$(echo "$repo" | tr / _)"
             git clone --depth 1 "https://github.com/$repo.git" "$dir" --quiet || continue
             tokei "$dir" --output json > "$dir/tokei.json"
-            python3 - "$repo" "$dir/tokei.json" <<'PY'
-import json, sys
-repo = sys.argv[1]; path = sys.argv[2]
-try:
-    with open(path) as f: data = json.load(f)
-    rust = data.get("Rust") or data.get("rust")
-    if rust:
-        print(f"{repo},{rust.get('files',0)},{rust.get('code',0)},{rust.get('comments',0)},{rust.get('blanks',0)}")
-    else:
-        print(f"{repo},0,0,0,0")
-except Exception:
-    print(f"{repo},0,0,0,0")
-PY
-          done < repos.txt >> rust_loc_results.csv
+            python3 scripts/parse_tokei.py "$repo" "$dir/tokei.json" >> rust_loc_results.csv
+          done < repos.txt
 
       - name: Estimate CFP and Summary Stats (Network I/O, Async Excluded)
         run: python3 scripts/analyze_loc_cfp_network.py
@@ -53,4 +39,4 @@ PY
         uses: actions/upload-artifact@v4
         with:
           name: rust-loc-cfp-summary-network
-          path: rust_loc_results_with_summary_network.csv
+          path: rust_loc_results_with_network.csv
