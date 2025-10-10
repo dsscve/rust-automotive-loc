@@ -1,4 +1,4 @@
-name: Rust LOC + CFP Analysis (with Network I/O, Async Excluded)
+name: Rust LOC + CFP Analysis (Network I/O, Async Excluded)
 
 on:
   workflow_dispatch:       # Manual trigger
@@ -18,7 +18,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y python3 git
           cargo install tokei
-          mkdir -p work
+
+      - name: Prepare work directory
+        run: mkdir -p work
 
       - name: Clone repos and run tokei
         run: |
@@ -27,16 +29,16 @@ jobs:
             [[ -z "$repo" ]] && continue
             echo "Processing $repo..."
             dir="work/$(echo "$repo" | tr / _)"
-            git clone --depth 1 "https://github.com/$repo.git" "$dir" --quiet || continue
+            git clone --depth 1 "$repo" "$dir" --quiet || continue
             tokei "$dir" --output json > "$dir/tokei.json"
-            python3 scripts/parse_tokei.py "$repo" "$dir/tokei.json" >> rust_loc_results.csv
+            python3 scripts/parse_tokei_network.py "$repo" "$dir/tokei.json" >> rust_loc_results.csv
           done < repos.txt
 
-      - name: Estimate CFP and Summary Stats (Network I/O, Async Excluded)
+      - name: Estimate CFP with Network I/O
         run: python3 scripts/analyze_loc_cfp_network.py
 
       - name: Upload LOC + CFP + Summary
         uses: actions/upload-artifact@v4
         with:
-          name: rust-loc-cfp-summary-network
+          name: rust-loc-cfp-network
           path: rust_loc_results_with_network.csv
