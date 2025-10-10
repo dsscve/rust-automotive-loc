@@ -1,4 +1,4 @@
-     name: Rust LOC + CFP Analysis (with Network I/O, Async Excluded)
+name: Rust LOC + CFP Analysis (with Network I/O, Async Excluded)
 
 on:
   workflow_dispatch:       # Manual trigger
